@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root"
+
+python3 -m compileall -q -f bin omarchy_protect test
+git diff --check -- .
+
+if rg -n '(AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{30,}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----)' \
+  --glob '!test/**' --glob '!README.md' --glob '!PRD.md' --glob '!CLAUDE.md' .; then
+  echo "possible committed secret" >&2
+  exit 1
+fi
+
+for file in ProtectWidget.qml ProtectSetup.qml; do
+  remote_text_count=$( { rg -n 'text:[[:space:]]*(root\.(lastError|cameraError|actionError)|String\(root\.selectedCamera)' "$file" || true; } | wc -l)
+  plain_text_count=$( { rg -n 'textFormat:[[:space:]]*Text\.PlainText' "$file" || true; } | wc -l)
+  if (( plain_text_count < remote_text_count )); then
+    echo "$file may render remote text without Text.PlainText" >&2
+    exit 1
+  fi
+done
+
+if rg -n 'curl[^\n|]*\|[[:space:]]*(ba)?sh|wget[^\n|]*\|[[:space:]]*(ba)?sh|sudo|pkexec|systemctl' \
+  --glob '!test/**' --glob '!README.md' --glob '!PRD.md' --glob '!CLAUDE.md' .; then
+  echo "forbidden installer or privilege surface" >&2
+  exit 1
+fi
