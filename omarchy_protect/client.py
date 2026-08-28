@@ -413,6 +413,24 @@ def _stream_manifest(stream_url: str, verify_tls: bool) -> bytes:
     ).encode("utf-8")
 
 
+def _stream_relay_command() -> list[str]:
+    """Build the low-latency, stream-copy relay command."""
+    return [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-f", "concat",
+        "-safe", "0",
+        "-protocol_whitelist", "file,pipe,tcp,tls,rtp,udp,crypto,data",
+        "-i", "pipe:0",
+        "-map", "0:v:0",
+        "-map", "0:a:0?",
+        "-c", "copy",
+        "-f", "matroska",
+        "pipe:1",
+    ]
+
+
 def serve_stream(
     stream_url: str, ready: Callable[[str], None], *, verify_tls: bool = True
 ) -> None:
@@ -472,7 +490,7 @@ def serve_stream(
                     continue
                 connection.sendall(
                     b"HTTP/1.1 200 OK\r\n"
-                    b"Content-Type: video/mp2t\r\n"
+                    b"Content-Type: video/x-matroska\r\n"
                     b"Cache-Control: no-store\r\n"
                     b"Connection: close\r\n\r\n"
                 )
@@ -481,23 +499,7 @@ def serve_stream(
                 read_fd, write_fd = os.pipe()
                 try:
                     child = subprocess.Popen(
-                        [
-                            "ffmpeg",
-                            "-hide_banner",
-                            "-loglevel", "error",
-                            "-fflags", "nobuffer",
-                            "-f", "concat",
-                            "-safe", "0",
-                            "-protocol_whitelist", "file,pipe,tcp,tls,rtp,udp,crypto,data",
-                            "-i", "pipe:0",
-                            "-map", "0:v:0",
-                            "-map", "0:a:0?",
-                            "-c", "copy",
-                            "-muxdelay", "0",
-                            "-muxpreload", "0",
-                            "-f", "mpegts",
-                            "pipe:1",
-                        ],
+                        _stream_relay_command(),
                         stdin=read_fd,
                         stdout=connection.fileno(),
                         stderr=subprocess.DEVNULL,

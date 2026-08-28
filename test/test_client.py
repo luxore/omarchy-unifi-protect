@@ -16,6 +16,7 @@ from omarchy_protect.client import (
     SameOriginRedirectHandler,
     SecretStore,
     _stream_manifest,
+    _stream_relay_command,
     canonical_console_url,
     launch_mpv,
     runtime_frame_path,
@@ -121,6 +122,13 @@ class ClientTests(unittest.TestCase):
             b"option rtsp_transport tcp\n"
             b"option tls_verify 0\n",
         )
+
+    def test_stream_relay_avoids_startup_buffer_regression(self) -> None:
+        command = _stream_relay_command()
+        self.assertNotIn("nobuffer", command)
+        self.assertEqual(command[-3:], ["-f", "matroska", "pipe:1"])
+        self.assertEqual(command[command.index("-c") + 1], "copy")
+
     def test_secret_is_sent_on_stdin_not_argv(self) -> None:
         with mock.patch("subprocess.run") as run:
             run.return_value = subprocess.CompletedProcess([], 0, "")
