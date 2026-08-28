@@ -9,6 +9,7 @@ FocusScope {
   id: root
 
   property string frameFit: "fit"
+  property bool hardwareDecoding: true
   property bool liveMuted: false
   property string liveQuality: "auto"
   property string refreshMode: "fast"
@@ -142,6 +143,16 @@ FocusScope {
         checked: root.liveMuted
         enabled: !root.saving
         onClicked: root.preferenceRequested("liveMuted", root.liveMuted ? "false" : "true")
+      }
+
+      Toggle {
+        width: parent.width
+        label: "GPU decoding for pop-out"
+        description: "Let mpv use a supported hardware decoder; the popup decoder is managed by Qt"
+        checked: root.hardwareDecoding
+        enabled: !root.saving
+        onClicked: root.preferenceRequested(
+          "hardwareDecoding", root.hardwareDecoding ? "false" : "true")
       }
 
       Text {

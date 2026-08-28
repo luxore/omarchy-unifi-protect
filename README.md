@@ -70,6 +70,10 @@ default. Its scroll wheel zooms instead of changing volume. Horizontal scroll
 or `Ctrl` + arrow keys pans, `Ctrl` + `0` resets the view, `M` toggles mute,
 and `F` toggles fullscreen.
 
+The pop-out uses GPU decoding when mpv can select a safe supported decoder.
+Turn off **GPU decoding for pop-out** to force software decoding. Popup decoding
+is managed by Qt and is not changed by this preference.
+
 Live viewing is read-only. The plugin passes Protect's RTSPS URL through an
 ephemeral process pipe. `mpv` consumes it for the dedicated window; FFmpeg
 remuxes the existing stream without re-encoding it for the popup's tokenized

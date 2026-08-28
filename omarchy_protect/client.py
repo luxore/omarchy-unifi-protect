@@ -364,6 +364,7 @@ def persist_settings(console_url: str, verify_tls: bool, *, setup_complete: bool
 def launch_mpv(
     stream_url: str,
     *,
+    hardware_decoding: bool = True,
     muted: bool = False,
     input_config: pathlib.Path | None = None,
 ) -> None:
@@ -377,7 +378,7 @@ def launch_mpv(
                 "--force-window=immediate",
                 "--profile=low-latency",
                 "--rtsp-transport=tcp",
-                "--hwdec=auto-safe",
+                f"--hwdec={'auto-safe' if hardware_decoding else 'no'}",
                 "--osc=yes",
                 "--keep-open=no",
                 "--loop-file=inf",

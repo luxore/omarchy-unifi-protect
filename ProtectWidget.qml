@@ -48,6 +48,7 @@ Panel {
   readonly property bool verifyTls: boolSetting("verifyTls", true)
   readonly property string favoriteCameraId: String(setting("favoriteCameraId", ""))
   readonly property string frameFit: String(setting("frameFit", "fit"))
+  readonly property bool hardwareDecoding: boolSetting("hardwareDecoding", true)
   readonly property bool liveMuted: boolSetting("liveMuted", false)
   readonly property string liveQuality: String(setting("liveQuality", "auto"))
   readonly property string refreshMode: String(setting("refreshMode", "fast"))
@@ -130,7 +131,7 @@ Panel {
     if (!realtimeMode || !opened || !showingViewer || !selectedConnected
         || previewProcess.running || (frameUrl !== "" && !frameStale)) return
     previewProcess.command = baseCommand().concat([
-      "watch", "--camera", String(selectedCamera.id), "--interval", "0.75", "--once"
+      "watch", "--camera", String(selectedCamera.id), "--interval", "0.75"
     ])
     previewProcess.running = true
   }
@@ -223,6 +224,7 @@ Panel {
     viewProcess.command = baseCommand().concat([
       "view", "--camera", String(selectedCamera.id),
       "--quality", liveQuality,
+      "--hardware-decoding", hardwareDecoding ? "true" : "false",
       "--muted", liveMuted ? "true" : "false"
     ])
     viewProcess.running = true
@@ -904,6 +906,7 @@ Panel {
           width: parent.width
           visible: root.showingPreferences
           frameFit: root.frameFit
+          hardwareDecoding: root.hardwareDecoding
           liveMuted: root.liveMuted
           liveQuality: root.liveQuality
           refreshMode: root.refreshMode

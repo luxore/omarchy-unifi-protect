@@ -54,6 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     view = commands.add_parser("view")
     view.add_argument("--camera", required=True)
     view.add_argument("--quality", choices=("auto", "high", "medium", "low"), default="auto")
+    view.add_argument("--hardware-decoding", type=boolean, default=True)
     view.add_argument("--muted", type=boolean, default=False)
     stream = commands.add_parser("stream")
     stream.add_argument("--camera", required=True)
@@ -62,6 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     preference.add_argument("--key", required=True, choices=(
         "favoriteCameraId",
         "frameFit",
+        "hardwareDecoding",
         "liveMuted",
         "liveQuality",
         "refreshMode",
@@ -129,6 +131,7 @@ def main() -> int:
         if args.command == "preference":
             choices = {
                 "frameFit": {"fit", "fill"},
+                "hardwareDecoding": {"true", "false"},
                 "liveMuted": {"true", "false"},
                 "liveQuality": {"auto", "high", "medium", "low"},
                 "refreshMode": {"realtime", "fast", "balanced", "efficient"},
@@ -162,6 +165,7 @@ def main() -> int:
         elif args.command == "view":
             launch_mpv(
                 client.stream_url(args.camera, args.quality),
+                hardware_decoding=args.hardware_decoding,
                 muted=args.muted,
                 input_config=ROOT / "mpv-camera.conf",
             )

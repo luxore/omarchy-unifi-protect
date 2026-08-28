@@ -33,6 +33,7 @@
       "verifyTls": true,
       "favoriteCameraId": "",
       "frameFit": "fit",
+      "hardwareDecoding": true,
       "liveMuted": false,
       "liveQuality": "auto",
       "refreshMode": "fast",
@@ -58,6 +59,12 @@
         "label": "Viewer framing",
         "options": ["fit", "fill"],
         "defaultValue": "fit"
+      },
+      {
+        "key": "hardwareDecoding",
+        "type": "boolean",
+        "label": "Use GPU decoding in the pop-out",
+        "defaultValue": true
       },
       {
         "key": "liveMuted",

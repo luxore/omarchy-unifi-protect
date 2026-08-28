@@ -166,6 +166,7 @@ class ClientTests(unittest.TestCase):
              mock.patch("os.close"), mock.patch("subprocess.Popen") as popen:
             launch_mpv(
                 "rtsps://nvr.local/live?token",
+                hardware_decoding=False,
                 muted=True,
                 input_config=pathlib.Path("/plugin/mpv-camera.conf"),
             )
@@ -174,6 +175,7 @@ class ClientTests(unittest.TestCase):
         self.assertIn("--mute=yes", argv)
         self.assertIn("--ontop=no", argv)
         self.assertIn("--no-config", argv)
+        self.assertIn("--hwdec=no", argv)
         self.assertIn("--wayland-app-id=io.github.luxore.unifi-protect-live", argv)
         self.assertIn("--input-conf=/plugin/mpv-camera.conf", argv)
         self.assertEqual(popen.call_args.kwargs["stdin"], 10)
