@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.luxore.unifi-protect",
   "name": "UniFi Protect Viewer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Luxore",
   "license": "MIT",
   "description": "A read-only UniFi Protect camera viewer for the Omarchy bar.",

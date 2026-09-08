@@ -18,7 +18,9 @@
 UniFi Protect Viewer puts one camera at a time in the Omarchy bar. Open
 the popup, switch cameras, and choose between efficient snapshots or an
 existing RTSPS feed for real-time video. Camera traffic stops when the popup
-closes.
+closes. An unresponsive video relay gets three seconds to exit before it is
+forcibly killed and reaped; abandoned local player connections do not
+stop the viewer.
 
 Real-time mode fetches one still immediately as a startup preview, then
 replaces it with video as soon as the RTSPS feed is ready.

@@ -431,10 +431,41 @@ def _stream_relay_command() -> list[str]:
     ]
 
 
+def _accept_stream_request(connection: socket.socket, path: str) -> bool:
+    """Keep an abandoned or malformed player request local to its connection."""
+    deadline = time.monotonic() + 3.0
+    request = b""
+    try:
+        while b"\r\n\r\n" not in request:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or len(request) >= 8192:
+                return False
+            connection.settimeout(remaining)
+            chunk = connection.recv(min(2048, 8192 - len(request)))
+            if not chunk:
+                return False
+            request += chunk
+        first_line = request.split(b"\r\n", 1)[0]
+        expected_get = f"GET {path} HTTP/1.1".encode("ascii")
+        expected_head = f"HEAD {path} HTTP/1.1".encode("ascii")
+        if first_line not in {expected_get, expected_head}:
+            connection.sendall(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
+            return False
+        connection.sendall(
+            b"HTTP/1.1 200 OK\r\n"
+            b"Content-Type: video/x-matroska\r\n"
+            b"Cache-Control: no-store\r\n"
+            b"Connection: close\r\n\r\n"
+        )
+        return first_line == expected_get
+    except OSError:
+        return False
+
+
 def serve_stream(
     stream_url: str, ready: Callable[[str], None], *, verify_tls: bool = True
 ) -> None:
-    """Relay one trusted RTSPS feed to a private loopback MPEG-TS endpoint."""
+    """Relay one trusted RTSPS feed to a private loopback Matroska endpoint."""
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(("127.0.0.1", 0))
@@ -448,8 +479,6 @@ def serve_stream(
     def stop(_signum: int, _frame: object) -> None:
         nonlocal stopping
         stopping = True
-        if child is not None and child.poll() is None:
-            child.terminate()
 
     def reap_child() -> None:
         nonlocal child
@@ -475,27 +504,10 @@ def serve_stream(
             except socket.timeout:
                 continue
             with connection:
-                connection.settimeout(3.0)
-                request = b""
-                while b"\r\n\r\n" not in request and len(request) <= 8192:
-                    chunk = connection.recv(2048)
-                    if not chunk:
-                        break
-                    request += chunk
-                first_line = request.split(b"\r\n", 1)[0]
-                expected_get = f"GET {path} HTTP/1.1".encode("ascii")
-                expected_head = f"HEAD {path} HTTP/1.1".encode("ascii")
-                if first_line not in {expected_get, expected_head}:
-                    connection.sendall(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n")
+                if not _accept_stream_request(connection, path) or stopping:
                     continue
-                connection.sendall(
-                    b"HTTP/1.1 200 OK\r\n"
-                    b"Content-Type: video/x-matroska\r\n"
-                    b"Cache-Control: no-store\r\n"
-                    b"Connection: close\r\n\r\n"
-                )
-                if first_line == expected_head:
-                    continue
+                # FFmpeg needs blocking stdout even though HTTP reads have a deadline.
+                connection.settimeout(None)
                 read_fd, write_fd = os.pipe()
                 try:
                     child = subprocess.Popen(
@@ -510,7 +522,12 @@ def serve_stream(
                     os.write(write_fd, _stream_manifest(stream_url, verify_tls))
                     os.close(write_fd)
                     write_fd = -1
-                    child.wait()
+                    while not stopping:
+                        try:
+                            child.wait(timeout=0.2)
+                            break
+                        except subprocess.TimeoutExpired:
+                            pass
                 finally:
                     if read_fd >= 0:
                         os.close(read_fd)
