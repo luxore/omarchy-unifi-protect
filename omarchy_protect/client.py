@@ -78,6 +78,16 @@ def safe_display_text(value: object, fallback: str) -> str:
     return text.strip()[:160] or fallback
 
 
+def validate_api_key(value: str) -> str:
+    key = value.strip()
+    if not key:
+        raise ProtectError("Connect a UniFi API key to continue", needs_auth=True)
+    # Reject unsafe header text before urllib can include it in an exception.
+    if len(key) > 4096 or any(not 32 <= ord(character) <= 126 for character in key):
+        raise ProtectError("Enter a valid UniFi API key", needs_auth=True)
+    return key
+
+
 class SecretStore:
     @staticmethod
     def lookup(console_url: str) -> str | None:
@@ -101,9 +111,7 @@ class SecretStore:
 
     @staticmethod
     def store(console_url: str, api_key: str) -> None:
-        key = api_key.strip()
-        if not key or len(key) > 4096 or "\x00" in key:
-            raise ProtectError("Enter a valid UniFi API key")
+        key = validate_api_key(api_key)
         try:
             subprocess.run(
                 [
@@ -193,9 +201,7 @@ class Camera:
 class ProtectClient:
     def __init__(self, console_url: str, api_key: str, *, verify_tls: bool = True) -> None:
         self.console_url = canonical_console_url(console_url)
-        self.api_key = api_key.strip()
-        if not self.api_key:
-            raise ProtectError("Connect a UniFi API key to continue", needs_auth=True)
+        self.api_key = validate_api_key(api_key)
         parsed = urllib.parse.urlsplit(self.console_url)
         self.origin = (parsed.scheme, parsed.hostname or "", parsed.port)
         context = ssl.create_default_context()

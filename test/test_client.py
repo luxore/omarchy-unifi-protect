@@ -4,6 +4,7 @@ import io
 import json
 import os
 import pathlib
+import runpy
 import subprocess
 import tempfile
 import unittest
@@ -45,6 +46,54 @@ class FakeResponse(io.BytesIO):
 
 
 class ClientTests(unittest.TestCase):
+    def test_malformed_api_keys_fail_without_exposing_or_using_the_key(self) -> None:
+        for key in (
+            "synthetic-secret\r\nX-Unwanted: value",
+            "synthetic-secret\x00value",
+            "synthetic-secret\tvalue",
+            "synthetic-secret\x7fvalue",
+            "synthetic-secret\u2603",
+            "synthetic-secret" + "x" * 4096,
+        ):
+            with self.subTest(key=repr(key)):
+                with mock.patch("urllib.request.build_opener") as opener:
+                    with self.assertRaises(ProtectError) as failure:
+                        ProtectClient("https://protect.local", key)
+                    self.assertNotIn("synthetic-secret", str(failure.exception))
+                    self.assertTrue(failure.exception.needs_auth)
+                    opener.assert_not_called()
+                with mock.patch("subprocess.run") as store:
+                    with self.assertRaises(ProtectError) as failure:
+                        SecretStore.store("https://protect.local", key)
+                    self.assertNotIn("synthetic-secret", str(failure.exception))
+                    store.assert_not_called()
+
+    def test_api_key_validation_preserves_paste_whitespace_and_limit(self) -> None:
+        key = "a" * 4096
+        client = ProtectClient("https://protect.local", f" {key}\n")
+        self.assertEqual(client.api_key, key)
+        with mock.patch("subprocess.run") as store:
+            SecretStore.store("https://protect.local", f" {key}\n")
+            self.assertEqual(store.call_args.kwargs["input"], key)
+
+    def test_cli_reports_invalid_key_as_authentication_error_without_io(self) -> None:
+        cli = pathlib.Path(__file__).resolve().parents[1] / "bin" / "omarchy-protect"
+        main = runpy.run_path(str(cli))["main"]
+        with mock.patch("sys.argv", [str(cli), "--url", "https://protect.local", "connect", "--stdin"]), \
+             mock.patch("sys.stdin", io.StringIO("synthetic-secret\u2603\n")), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as output, \
+             mock.patch("sys.stderr", new_callable=io.StringIO) as errors, \
+             mock.patch("socket.create_connection") as network, \
+             mock.patch("subprocess.run") as store:
+            self.assertEqual(main(), 1)
+        result = json.loads(output.getvalue())
+        self.assertTrue(result["needsAuth"])
+        self.assertEqual(result["error"], "Enter a valid UniFi API key")
+        self.assertNotIn("synthetic-secret", output.getvalue() + errors.getvalue())
+        self.assertEqual(errors.getvalue(), "")
+        network.assert_not_called()
+        store.assert_not_called()
+
     def test_canonical_console_url(self) -> None:
         self.assertEqual(canonical_console_url(" Protect.Local/ "), "https://protect.local")
         self.assertEqual(canonical_console_url("https://[fd00::1]:8443"), "https://[fd00::1]:8443")

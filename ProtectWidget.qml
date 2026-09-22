@@ -37,6 +37,7 @@ Panel {
   property bool abandoningWatch: false
   property bool abandoningStreamRequest: false
   property bool abandoningConnect: false
+  property bool abandoningCameraList: false
   property string currentTab: setupComplete ? "viewer" : "connection"
   property bool chooseFavoriteOnNextLoad: true
   property string pendingKey: ""
@@ -89,11 +90,19 @@ Panel {
   }
 
   function refreshCameras() {
-    if (cameraListProcess.running || instanceUrl === "") return
+    if (cameraListProcess.running || abandoningCameraList || instanceUrl === "") return
     loading = true
     lastError = ""
     cameraListProcess.command = baseCommand().concat(["cameras"])
     cameraListProcess.running = true
+  }
+
+  function stopCameraList() {
+    loading = false
+    if (cameraListProcess.running) {
+      abandoningCameraList = true
+      cameraListProcess.running = false
+    }
   }
 
   function selectCamera(index) {
@@ -295,6 +304,11 @@ Panel {
     stdout: StdioCollector { id: cameraListStdout; waitForEnd: true }
     onExited: function(exitCode) {
       root.loading = false
+      if (root.abandoningCameraList) {
+        root.abandoningCameraList = false
+        if (root.opened && root.showingViewer) Qt.callLater(root.refreshCameras)
+        return
+      }
       var parsed = root.acceptJson(cameraListStdout.text, "The camera list was unreadable")
       if (exitCode !== 0 || parsed.error) {
         root.lastError = String(parsed.error || "Could not load UniFi Protect cameras")
@@ -537,6 +551,7 @@ Panel {
       if (!setupComplete) showConnection()
       else showViewer()
     } else {
+      stopCameraList()
       stopWatch()
       if (connectProcess.running) {
         abandoningConnect = true
@@ -548,6 +563,7 @@ Panel {
   }
 
   onInstanceUrlChanged: {
+    stopCameraList()
     cameras = []
     selectedIndex = 0
     frameUrl = ""
